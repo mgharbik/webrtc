@@ -3,9 +3,17 @@
 	
 	<div id="settings">
 		{{view "select" content=constraintsList value=selectedConstraints}}
+		
+		<div id="buttons">
+		  <button id="startButton">Start</button>
+		  <button id="callButton">Call</button>
+		  <button id="hangupButton">Hang Up</button>
+		</div>
 	</div>
 	
 	<br />
 	
-	<video autoplay></video>
+	<video id="localVideo" autoplay></video>
+	<video id="remoteVideo" autoplay></video>
+	
 </div>
