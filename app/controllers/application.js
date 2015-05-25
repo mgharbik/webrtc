@@ -1,7 +1,7 @@
 import Ember from 'ember';
 
 export default Ember.Controller.extend({
-	constraintsList: ['HD, VGA'],
+	constraintsList: ['HD', 'VGA'],
 	selectedConstraints: 'HD',
 	constraints: null,
 
@@ -13,7 +13,8 @@ export default Ember.Controller.extend({
 						minWidth: 1280,
 		      		  	minHeight: 720
 		    		}
-		  	  	}
+		  	  	},
+				audio: true
 			};
 		} else if (this.get('selectedConstraints') == 'VGA')  {
 			return {
@@ -22,7 +23,8 @@ export default Ember.Controller.extend({
 		      	  		maxWidth: 640,
 		      	  		maxHeight: 360
 		    		}
-		  	  }
+		  	  	},
+				audio: true
 			};
 		}
 	},
@@ -36,9 +38,9 @@ export default Ember.Controller.extend({
 		navigator.getUserMedia(this.getConstraints(), this.successCallback, this.errorCallback);
 	},
 
-	successCallback: function(stream){
+	successCallback: function(localMediaStream){
 		var video = document.querySelector('video');
-		video.src = window.URL.createObjectURL(stream);
+		video.src = window.URL.createObjectURL(localMediaStream);
 	},
 
 	errorCallback: function(error){

@@ -1,5 +1,11 @@
 <div id="container">
 	<h2 id="title">WebRTC first example</h2>
-
+	
+	<div id="settings">
+		{{view "select" content=constraintsList value=selectedConstraints}}
+	</div>
+	
+	<br />
+	
 	<video autoplay></video>
 </div>
