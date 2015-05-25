@@ -1,4 +1,7 @@
 import Ember from 'ember';
+//import nodeStatic from 'node-static';
+//import http from 'http';
+//import socket from 'socket.io';
 
 export default Ember.Controller.extend({
 	constraintsList: ['HD', 'VGA'],
@@ -34,119 +37,84 @@ export default Ember.Controller.extend({
 	//}.observes('selectedConstraints'),
 	
 	setUserMedia: function(){
-		var localStream, localPeerConnection, remotePeerConnection;
 		
 		var constraints = {
 			video: { mandatory: { maxWidth: 640, maxHeight: 360 } },
 			audio: true
 		};
+		
+		this.runServer();
 
-		var localVideo = document.getElementById("localVideo");
-		var remoteVideo = document.getElementById("remoteVideo");
+		var isInitiator;
 
-		var startButton = document.getElementById("startButton");
-		var callButton = document.getElementById("callButton");
-		var hangupButton = document.getElementById("hangupButton");
-		startButton.disabled = false;
-		callButton.disabled = true;
-		hangupButton.disabled = true;
-		startButton.onclick = start;
-		callButton.onclick = call;
-		hangupButton.onclick = hangup;
+		var room = prompt("Enter room name:");
 
-		function trace(text) {
-		  console.log((performance.now() / 1000).toFixed(3) + ": " + text);
+		var socket = io.connect();
+
+		if (room !== "") {
+		  console.log('Joining room ' + room);
+		  socket.emit('create or join', room);
 		}
 
-		function gotStream(stream){
-		  trace("Received local stream");
-		  localVideo.src = URL.createObjectURL(stream);
-		  localStream = stream;
-		  callButton.disabled = false;
-		}
+		socket.on('full', function (room){
+		  console.log('Room ' + room + ' is full');
+		});
 
-		function start() {
-		  trace("Requesting local stream");
-		  startButton.disabled = true;
-		  
-		  navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-		  navigator.getUserMedia(constraints, gotStream,
-		    function(error) {
-		      trace("getUserMedia error: ", error);
-		    });
-		}
+		socket.on('empty', function (room){
+		  isInitiator = true;
+		  console.log('Room ' + room + ' is empty');
+		});
 
-		function call() {
-		  callButton.disabled = true;
-		  hangupButton.disabled = false;
-		  trace("Starting call");
+		socket.on('join', function (room){
+		  console.log('Making request to join room ' + room);
+		  console.log('You are the initiator!');
+		});
 
-		  if (localStream.getVideoTracks().length > 0) {
-		    trace('Using video device: ' + localStream.getVideoTracks()[0].label);
-		  }
-		  if (localStream.getAudioTracks().length > 0) {
-		    trace('Using audio device: ' + localStream.getAudioTracks()[0].label);
-		  }
+		socket.on('log', function (array){
+		  console.log.apply(console, array);
+		});
+	},
+	
+	runServer: function() {
+		let socket = this.get('websocket.socket');
 
-		  var servers = null;
+		  // convenience function to log server messages on the client
+			function log(){
+				var array = [">>> Message from server: "];
+			  for (var i = 0; i < arguments.length; i++) {
+			  	array.push(arguments[i]);
+			  }
+			    socket.emit('log', array);
+			}
 
-		  localPeerConnection = new webkitRTCPeerConnection(servers);
-		  trace("Created local peer connection object localPeerConnection");
-		  localPeerConnection.onicecandidate = gotLocalIceCandidate;
+			socket.on('message', function (message) {
+				log('Got message:', message);
+		    // for a real app, would be room only (not broadcast)
+				socket.broadcast.emit('message', message);
+			});
 
-		  remotePeerConnection = new webkitRTCPeerConnection(servers);
-		  trace("Created remote peer connection object remotePeerConnection");
-		  remotePeerConnection.onicecandidate = gotRemoteIceCandidate;
-		  remotePeerConnection.onaddstream = gotRemoteStream;
+			socket.on('create or join', function (room) {
+				var numClients = io.sockets.clients(room).length;
 
-		  localPeerConnection.addStream(localStream);
-		  trace("Added localStream to localPeerConnection");
-		  localPeerConnection.createOffer(gotLocalDescription,handleError);
-		}
+				log('Room ' + room + ' has ' + numClients + ' client(s)');
+				log('Request to create or join room ' + room);
 
-		function gotLocalDescription(description){
-		  localPeerConnection.setLocalDescription(description);
-		  trace("Offer from localPeerConnection: \n" + description.sdp);
-		  remotePeerConnection.setRemoteDescription(description);
-		  remotePeerConnection.createAnswer(gotRemoteDescription,handleError);
-		}
+				if (numClients === 0){
+					socket.join(room);
+					socket.emit('created', room);
+				} else if (numClients === 1) {
+					io.sockets.in(room).emit('join', room);
+					socket.join(room);
+					socket.emit('joined', room);
+				} else { // max two clients
+					socket.emit('full', room);
+				}
+				socket.emit('emit(): client ' + socket.id + ' joined room ' + room);
+				socket.broadcast.emit('broadcast(): client ' + socket.id + ' joined room ' + room);
 
-		function gotRemoteDescription(description){
-		  remotePeerConnection.setLocalDescription(description);
-		  trace("Answer from remotePeerConnection: \n" + description.sdp);
-		  localPeerConnection.setRemoteDescription(description);
-		}
+			});
 
-		function hangup() {
-		  trace("Ending call");
-		  localPeerConnection.close();
-		  remotePeerConnection.close();
-		  localPeerConnection = null;
-		  remotePeerConnection = null;
-		  hangupButton.disabled = true;
-		  callButton.disabled = false;
-		}
 
-		function gotRemoteStream(event){
-		  remoteVideo.src = URL.createObjectURL(event.stream);
-		  trace("Received remote stream");
-		}
-
-		function gotLocalIceCandidate(event){
-		  if (event.candidate) {
-		    remotePeerConnection.addIceCandidate(new RTCIceCandidate(event.candidate));
-		    trace("Local ICE candidate: \n" + event.candidate.candidate);
-		  }
-		}
-
-		function gotRemoteIceCandidate(event){
-		  if (event.candidate) {
-		    localPeerConnection.addIceCandidate(new RTCIceCandidate(event.candidate));
-		    trace("Remote ICE candidate: \n " + event.candidate.candidate);
-		  }
-		}
-
-		function handleError(){}
 	},
 
 	successCallback: function(localMediaStream){
