@@ -95,7 +95,7 @@ export default Ember.Controller.extend({
 	    // set caller ID and connect to the PeerJS server
 	    var connect = function () {
 	      // callerId = callerIdEntry.value;
-		  console.log('Connecting to server as Remote...')
+		  console.log('Connecting to server as Remote...');
 
 	      if (!callerId) {
 	        logError('please set caller ID first');
@@ -132,7 +132,7 @@ export default Ember.Controller.extend({
 
 	    // make an outgoing call
 	    var dial = function () {
-		  console.log('Calling...')
+			console.log('Calling...');
 			
 	      if (!peer) {
 	        logError('please connect first');
@@ -141,7 +141,7 @@ export default Ember.Controller.extend({
 
 	      if (!localStream) {
 	        logError('could not start call as there is no local camera');
-	        return
+	        return;
 	      }
 
 	      // var recipientId = recipientIdEntry.value;
