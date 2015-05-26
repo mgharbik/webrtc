@@ -1,3 +1,11 @@
 #container {
   text-align: center;
 }
+
+#remote-video {
+  max-width: 600px;
+}
+
+#local-video {
+  max-width: 200px;
+}

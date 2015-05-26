@@ -1,161 +1,197 @@
 import Ember from 'ember';
 
 export default Ember.Controller.extend({
-	constraintsList: ['HD', 'VGA'],
-	selectedConstraints: 'HD',
-	constraints: null,
 
-	getConstraints: function(){
-		if (this.get('selectedConstraints') == 'HD') {
-			return {
-				video: {
-		    		mandatory: {
-						minWidth: 1280,
-		      		  	minHeight: 720
-		    		}
-		  	  	},
-				audio: true
-			};
-		} else if (this.get('selectedConstraints') == 'VGA')  {
-			return {
-				video: {
-					mandatory: {
-		      	  		maxWidth: 640,
-		      	  		maxHeight: 360
-		    		}
-		  	  	},
-				audio: true
-			};
-		}
-	},
-
-	//didConstraintsChanged: function(){
-	//	this.setUserMedia();
-	//}.observes('selectedConstraints'),
 	
-	setUserMedia: function(){
-		var localStream, localPeerConnection, remotePeerConnection;
+	callWebRTC: function(){
+	    // PeerJS server location
+	    var SERVER_IP = '192.168.1.45';
+	    var SERVER_PORT = 9000;
+
+	    // DOM elements manipulated as user interacts with the app
+	    var messageBox = document.querySelector('#messages');
+	    // var callerIdEntry = document.querySelector('#caller-id');
+	    // var connectBtn = document.querySelector('#connect');
+	    // var recipientIdEntry = document.querySelector('#recipient-id');
+	    var dialBtn = document.querySelector('#dial');
+	    var remoteVideo = document.querySelector('#remote-video');
+	    var localVideo = document.querySelector('#local-video');
+
+	    // the ID set for this client
+	    var callerId = 'doctor';
+		var recipientId = 'costumer';
+
+	    // PeerJS object, instantiated when this client connects with its
+	    // caller ID
+	    var peer = null;
+
+	    // the local video stream captured with getUserMedia()
+	    var localStream = null;
 		
-		var constraints = {
-			video: { mandatory: { maxWidth: 640, maxHeight: 360 } },
-			audio: true
-		};
+	    // DOM utilities
+	    var makePara = function (text) {
+	      var p = document.createElement('p');
+	      p.innerText = text;
+	      return p;
+	    };
 
-		var localVideo = document.getElementById("localVideo");
-		var remoteVideo = document.getElementById("remoteVideo");
+	    var addMessage = function (para) {
+	      if (messageBox.firstChild) {
+	        messageBox.insertBefore(para, messageBox.firstChild);
+	      }
+	      else {
+	        messageBox.appendChild(para);
+	      }
+	    };
 
-		var startButton = document.getElementById("startButton");
-		var callButton = document.getElementById("callButton");
-		var hangupButton = document.getElementById("hangupButton");
-		startButton.disabled = false;
-		callButton.disabled = true;
-		hangupButton.disabled = true;
-		startButton.onclick = start;
-		callButton.onclick = call;
-		hangupButton.onclick = hangup;
+	    var logError = function (text) {
+	      var p = makePara('ERROR: ' + text);
+	      p.style.color = 'red';
+	      addMessage(p);
+	    };
 
-		function trace(text) {
-		  console.log((performance.now() / 1000).toFixed(3) + ": " + text);
-		}
+	    var logMessage = function (text) {
+	      addMessage(makePara(text));
+	    };
 
-		function gotStream(stream){
-		  trace("Received local stream");
-		  localVideo.src = URL.createObjectURL(stream);
-		  localStream = stream;
-		  callButton.disabled = false;
-		}
+	    // get the local video and audio stream and show preview in the
+	    // "LOCAL" video element
+	    // successCb: has the signature successCb(stream); receives
+	    // the local video stream as an argument
+	    var getLocalStream = function (successCb) {
+	      if (localStream && successCb) {
+	        successCb(localStream);
+	      }
+	      else {
+	        navigator.webkitGetUserMedia(
+	          {
+	            audio: true,
+	            video: true
+	          },
 
-		function start() {
-		  trace("Requesting local stream");
-		  startButton.disabled = true;
+	          function (stream) {
+	            localStream = stream;
+
+	            localVideo.src = window.URL.createObjectURL(stream);
+
+	            if (successCb) {
+	              successCb(stream);
+	            }
+	          },
+
+	          function (err) {
+	            logError('failed to access local camera');
+	            logError(err.message);
+	          }
+	        );
+	      }
+	    };
+
+	    // set the "REMOTE" video element source
+	    var showRemoteStream = function (stream) {
+	      remoteVideo.src = window.URL.createObjectURL(stream);
+	    };
+
+	    // set caller ID and connect to the PeerJS server
+	    var connect = function () {
+	      // callerId = callerIdEntry.value;
+		  console.log('Connecting to server as Remote...')
+
+	      if (!callerId) {
+	        logError('please set caller ID first');
+	        return;
+	      }
+
+	      try {
+	        // create connection to the ID server
+	        peer = new Peer(callerId, {host: SERVER_IP, port: SERVER_PORT});
+
+	        // hack to get around the fact that if a server connection cannot
+	        // be established, the peer and its socket property both still have
+	        // open === true; instead, listen to the wrapped WebSocket
+	        // and show an error if its readyState becomes CLOSED
+	        peer.socket._socket.onclose = function () {
+	          logError('no connection to server');
+	          peer = null;
+	        };
+
+	        // get local stream ready for incoming calls once the wrapped
+	        // WebSocket is open
+	        peer.socket._socket.onopen = function () {
+	          getLocalStream();
+	        };
+
+	        // handle events representing incoming calls
+	        peer.on('call', answer);
+	      }
+	      catch (e) {
+	        peer = null;
+	        logError('error while connecting to server');
+	      }
+	    };
+
+	    // make an outgoing call
+	    var dial = function () {
+		  console.log('Calling...')
+			
+	      if (!peer) {
+	        logError('please connect first');
+	        return;
+	      }
+
+	      if (!localStream) {
+	        logError('could not start call as there is no local camera');
+	        return
+	      }
+
+	      // var recipientId = recipientIdEntry.value;
+
+	      if (!recipientId) {
+	        logError('could not start call as no recipient ID is set');
+	        return;
+	      }
+
+	      getLocalStream(function (stream) {
+	        logMessage('outgoing call initiated');
+
+	        var call = peer.call(recipientId, stream);
+
+	        call.on('stream', showRemoteStream);
+
+	        call.on('error', function (e) {
+	          logError('error with call');
+	          logError(e.message);
+	        });
+	      });
 		  
-		  navigator.getUserMedia  = navigator.getUserMedia || navigator.webkitGetUserMedia || navigator.mozGetUserMedia || navigator.msGetUserMedia;
-		  navigator.getUserMedia(constraints, gotStream,
-		    function(error) {
-		      trace("getUserMedia error: ", error);
-		    });
-		}
+		  dialBtn.disabled = true;
+	    };
 
-		function call() {
-		  callButton.disabled = true;
-		  hangupButton.disabled = false;
-		  trace("Starting call");
+	    // answer an incoming call
+	    var answer = function (call) {
+	      if (!peer) {
+	        logError('cannot answer a call without a connection');
+	        return;
+	      }
 
-		  if (localStream.getVideoTracks().length > 0) {
-		    trace('Using video device: ' + localStream.getVideoTracks()[0].label);
-		  }
-		  if (localStream.getAudioTracks().length > 0) {
-		    trace('Using audio device: ' + localStream.getAudioTracks()[0].label);
-		  }
+	      if (!localStream) {
+	        logError('could not answer call as there is no localStream ready');
+	        return;
+	      }
 
-		  var servers = null;
+	      logMessage('incoming call answered');
 
-		  localPeerConnection = new webkitRTCPeerConnection(servers);
-		  trace("Created local peer connection object localPeerConnection");
-		  localPeerConnection.onicecandidate = gotLocalIceCandidate;
+	      call.on('stream', showRemoteStream);
 
-		  remotePeerConnection = new webkitRTCPeerConnection(servers);
-		  trace("Created remote peer connection object remotePeerConnection");
-		  remotePeerConnection.onicecandidate = gotRemoteIceCandidate;
-		  remotePeerConnection.onaddstream = gotRemoteStream;
+	      call.answer(localStream);
+	    };
 
-		  localPeerConnection.addStream(localStream);
-		  trace("Added localStream to localPeerConnection");
-		  localPeerConnection.createOffer(gotLocalDescription,handleError);
-		}
-
-		function gotLocalDescription(description){
-		  localPeerConnection.setLocalDescription(description);
-		  trace("Offer from localPeerConnection: \n" + description.sdp);
-		  remotePeerConnection.setRemoteDescription(description);
-		  remotePeerConnection.createAnswer(gotRemoteDescription,handleError);
-		}
-
-		function gotRemoteDescription(description){
-		  remotePeerConnection.setLocalDescription(description);
-		  trace("Answer from remotePeerConnection: \n" + description.sdp);
-		  localPeerConnection.setRemoteDescription(description);
-		}
-
-		function hangup() {
-		  trace("Ending call");
-		  localPeerConnection.close();
-		  remotePeerConnection.close();
-		  localPeerConnection = null;
-		  remotePeerConnection = null;
-		  hangupButton.disabled = true;
-		  callButton.disabled = false;
-		}
-
-		function gotRemoteStream(event){
-		  remoteVideo.src = URL.createObjectURL(event.stream);
-		  trace("Received remote stream");
-		}
-
-		function gotLocalIceCandidate(event){
-		  if (event.candidate) {
-		    remotePeerConnection.addIceCandidate(new RTCIceCandidate(event.candidate));
-		    trace("Local ICE candidate: \n" + event.candidate.candidate);
-		  }
-		}
-
-		function gotRemoteIceCandidate(event){
-		  if (event.candidate) {
-		    localPeerConnection.addIceCandidate(new RTCIceCandidate(event.candidate));
-		    trace("Remote ICE candidate: \n " + event.candidate.candidate);
-		  }
-		}
-
-		function handleError(){}
-	},
-
-	successCallback: function(localMediaStream){
-		var video = document.querySelector('video');
-		video.src = window.URL.createObjectURL(localMediaStream);
-	},
-
-	errorCallback: function(error){
-		console.log('navigator.getUserMedia error: ', error);
+	    // wire up button events
+	    // connectBtn.addEventListener('click', connect);
+	    dialBtn.addEventListener('click', dial);
+		connect();
+		// dial();
+		
 	}
-
+	
 });
