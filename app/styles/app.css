@@ -131,7 +131,7 @@ label {
 #mini-video {
   border: 1px solid gray;
   bottom: 20px;
-  left: 20px;
+  right: 20px;
   /* video div is flipped horizontally when active*/
   max-height: 17%;
   max-width: 17%;

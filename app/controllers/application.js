@@ -48,6 +48,8 @@ export default Ember.Controller.extend({
 	    var remoteVideo = document.querySelector('#remote-video');
 	    var localVideo = document.querySelector('#local-video');
 
+	    var icons = document.querySelector('#icons');
+
 	    // the ID set for this client
 	    var callerId = 'doctor';
 		var recipientId = 'costumer';
@@ -186,11 +188,16 @@ export default Ember.Controller.extend({
 	        logMessage('outgoing call initiated');
 
 	        var call = peer.call(recipientId, stream);
-			
-			miniVideo.src = window.URL.createObjectURL(stream);
-			localVideo = null;
-	        call.on('stream', showRemoteStream);
 
+	        call.on('stream', showRemoteStream);
+			
+			miniVideo.src = localVideo.src;
+
+			remoteVideo.classList.add('active');
+			miniVideo.classList.add('active');
+			localVideo.classList.add('active');
+			localVideo.src = '';
+									
 	        call.on('error', function (e) {
 	          logError('error with call');
 	          logError(e.message);
