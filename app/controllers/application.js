@@ -49,10 +49,16 @@ export default Ember.Controller.extend({
 	    var localVideo = document.querySelector('#local-video');
 
 	    var icons = document.querySelector('#icons');
+		icons.classList.add('active');
+		icons.classList.remove('hidden');
+
+	    var videos = document.querySelector('#videos');
+		videos.classList.add('active');
+
 
 	    // the ID set for this client
-	    var callerId = 'doctor';
-		var recipientId = 'costumer';
+	    var callerId = '055675177431a720ef243f6ed48f104e';
+		var recipientId = '7';
 
 	    // PeerJS object, instantiated when this client connects with its
 	    // caller ID
@@ -128,7 +134,7 @@ export default Ember.Controller.extend({
 	    // set caller ID and connect to the PeerJS server
 	    var connect = function () {
 	      // callerId = callerIdEntry.value;
-		  console.log('Connecting to server as Remote...')
+		  console.log('Connecting to server as Remote...');
 
 	      if (!callerId) {
 	        logError('please set caller ID first');
@@ -165,7 +171,7 @@ export default Ember.Controller.extend({
 
 	    // make an outgoing call
 	    var dial = function () {
-		  console.log('Calling...')
+			console.log('Calling...');
 			
 	      if (!peer) {
 	        logError('please connect first');
@@ -174,7 +180,7 @@ export default Ember.Controller.extend({
 
 	      if (!localStream) {
 	        logError('could not start call as there is no local camera');
-	        return
+	        return;
 	      }
 
 	      // var recipientId = recipientIdEntry.value;
@@ -195,9 +201,8 @@ export default Ember.Controller.extend({
 
 			remoteVideo.classList.add('active');
 			miniVideo.classList.add('active');
-			localVideo.classList.add('active');
 			localVideo.src = '';
-									
+					
 	        call.on('error', function (e) {
 	          logError('error with call');
 	          logError(e.message);
@@ -227,10 +232,8 @@ export default Ember.Controller.extend({
 	    };
 
 	    // wire up button events
-	    // connectBtn.addEventListener('click', connect);
 	    dialBtn.addEventListener('click', dial);
 		connect();
-		// dial();
 		
 	},
 
