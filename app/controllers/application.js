@@ -40,28 +40,28 @@ export default Ember.Controller.extend({
 
 	    // DOM elements manipulated as user interacts with the app
 	    var messageBox = document.querySelector('#messages');
-	    // var callerIdEntry = document.querySelector('#caller-id');
-	    // var connectBtn = document.querySelector('#connect');
-	    // var recipientIdEntry = document.querySelector('#recipient-id');
+		var messages = $('#messages');
 	    var dialBtn = document.querySelector('#dial');
+		var sendBtn = document.querySelector('#send-button');
+		var messageInput = document.querySelector('#message-input');
+		var fileInput = document.querySelector('#file-input');
+			
 	    var miniVideo = document.querySelector('#mini-video');
 	    var remoteVideo = document.querySelector('#remote-video');
 	    var localVideo = document.querySelector('#local-video');
-
+	    var videos = document.querySelector('#videos');
+		videos.classList.add('active');
+		
 	    var icons = document.querySelector('#icons');
 		icons.classList.add('active');
 		icons.classList.remove('hidden');
-
-	    var videos = document.querySelector('#videos');
-		videos.classList.add('active');
 
 
 	    // the ID set for this client
 	    var callerId = '055675177431a720ef243f6ed48f104e';
 		var recipientId = '7';
 
-	    // PeerJS object, instantiated when this client connects with its
-	    // caller ID
+	    // PeerJS object, instantiated when this client connects with its caller ID
 	    var peer = null;
 
 	    // the local video stream captured with getUserMedia()
@@ -93,10 +93,8 @@ export default Ember.Controller.extend({
 	      addMessage(makePara(text));
 	    };
 
-	    // get the local video and audio stream and show preview in the
-	    // "LOCAL" video element
-	    // successCb: has the signature successCb(stream); receives
-	    // the local video stream as an argument
+	    // get the local video and audio stream and show preview in the "LOCAL" video element
+	    // successCb: has the signature successCb(stream); receives the local video stream as an argument
 	    var getLocalStream = function (successCb) {
 	      if (localStream && successCb) {
 	        successCb(localStream);
@@ -133,7 +131,6 @@ export default Ember.Controller.extend({
 
 	    // set caller ID and connect to the PeerJS server
 	    var connect = function () {
-	      // callerId = callerIdEntry.value;
 		  console.log('Connecting to server as Remote...');
 
 	      if (!callerId) {
@@ -162,6 +159,13 @@ export default Ember.Controller.extend({
 
 	        // handle events representing incoming calls
 	        peer.on('call', answer);
+
+	        // handle events representing incoming messages or files			
+			peer.on('connection', connectChat);
+			
+			peer.on('open', function(id){
+			  logMessage('You\'re connected to chat.');	
+			});
 	      }
 	      catch (e) {
 	        peer = null;
@@ -183,15 +187,13 @@ export default Ember.Controller.extend({
 	        return;
 	      }
 
-	      // var recipientId = recipientIdEntry.value;
-
 	      if (!recipientId) {
 	        logError('could not start call as no recipient ID is set');
 	        return;
 	      }
 
 	      getLocalStream(function (stream) {
-	        logMessage('outgoing call initiated');
+	        // logMessage('outgoing call initiated');
 
 	        var call = peer.call(recipientId, stream);
 
@@ -224,17 +226,65 @@ export default Ember.Controller.extend({
 	        return;
 	      }
 
-	      logMessage('incoming call answered');
+	      messages.append('<div><span class="peer">Customer has joined the chat.</span></div>');
 
 	      call.on('stream', showRemoteStream);
 
 	      call.answer(localStream);
 	    };
+		
+		var connectChat = function(c) {
+		  if (c.label === 'chat') {
+		    c.on('data', function(data){
+			  messages.append('<div><span class="peer">Customer</span>: ' + data + '</div>');  
+			});
+		    c.on('close', function(){
+		      messages.append('<div><span class="peer">Customer has left the chat.</span></div>');
+			  delete peer.connections[recipientId];
+		    });
+		  }	else if (c.label === 'file') {
+		    c.on('data', function(data){
+			  if (data.constructor === ArrayBuffer) {
+			    var dataView = new Uint8Array(data);
+				var dataBlob = new Blob([dataView]);
+				var url = window.URL.createObjectURL(dataBlob);
+				messages.append('<div><span class="file">Customer has sent you a <a download="' + url + '" href="' + url + '">file</a></span></div>');
+			  }
+			});
+		  }
+		};
+		
+		var send = function(){
+  		  var msg = messageInput.value;
+		  var file_name = fileInput.value;
+		  var files = document.getElementById("file-input").files;
+		  
+		  if (msg.length != 0) {
+			var c = peer.connect(recipientId, { label: 'chat', serialization: 'none', metadata: {message: 'Chat started...'} });
+			c.on('open', function(){ c.send(msg); });
+		   	$('#messages').append('<div><span class="you">You: </span>' + msg + '</div>');
+			messageInput.value = '';
+			console.log('message was sent: ', msg);
+		  }
+		  
+		  if (files.length > 0) {
+			var f = peer.connect(recipientId, { label: 'file', reliable: true });
+			f.on('open', function(){ f.send(files[0]); });
+			$('#messages').append('<div><span class="you">You sent file to customer</span></div>');
+			console.log('file was sent: ', file_name);
+		  }
+		};
 
 	    // wire up button events
 	    dialBtn.addEventListener('click', dial);
+		sendBtn.addEventListener('click', send);
 		connect();
 		
+		window.onunload = window.onbeforeunload = function(e) {
+		  if (!!peer && !peer.destroyed) {
+		    peer.destroy();
+		  }
+		};
 	},
 
 	successCallback: function(localMediaStream){

@@ -4,12 +4,22 @@
       	<video id="local-video" autoplay muted></video>
     </div>
 	
-	
     <footer>
-		 <div class="active">
-		 	<button id="dial">Call</button>
-			<div id="messages"></div>
-		 </div>
+		<div id="chat" class="active">
+			<button id="dial">Call</button>
+		  	<div class="row" id="form-chat">
+				<div class="columns large-7">
+		  	  		<input type="text" id="message-input" placeholder="Ecrire un message">
+		    	</div>
+		    	<div class="columns large-2">
+		      	  <button id="send-button">Envoyer</button>
+		    	</div>
+		  	  	<div class="columns large-3">
+		    		<input type="file" id="file-input">
+		 	 	</div>
+	    	</div>
+			<div class="row" id="messages"></div>
+		</div>
     </footer>
 		
     <div id="icons" class="active">
