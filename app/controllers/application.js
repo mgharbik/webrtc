@@ -6,7 +6,7 @@ export default Ember.Controller.extend({
 	constraints: null,
 
 	getConstraints: function(){
-		if (this.get('selectedConstraints') == 'HD') {
+		if (this.get('selectedConstraints') === 'HD') {
 			return {
 				video: {
 		    		mandatory: {
@@ -16,7 +16,7 @@ export default Ember.Controller.extend({
 		  	  	},
 				audio: true
 			};
-		} else if (this.get('selectedConstraints') == 'VGA')  {
+		} else if (this.get('selectedConstraints') === 'VGA')  {
 			return {
 				video: {
 					mandatory: {
@@ -63,7 +63,8 @@ export default Ember.Controller.extend({
 
 	    // PeerJS object, instantiated when this client connects with its caller ID
 	    var peer = null;
-
+		var connectedPeer = false;
+		
 	    // the local video stream captured with getUserMedia()
 	    var localStream = null;
 		
@@ -133,11 +134,6 @@ export default Ember.Controller.extend({
 	    var connect = function () {
 		  console.log('Connecting to server as Remote...');
 
-	      if (!callerId) {
-	        logError('please set caller ID first');
-	        return;
-	      }
-
 	      try {
 	        // create connection to the ID server
 	        peer = new Peer(callerId, {host: SERVER_IP, port: SERVER_PORT});
@@ -187,11 +183,6 @@ export default Ember.Controller.extend({
 	        return;
 	      }
 
-	      if (!recipientId) {
-	        logError('could not start call as no recipient ID is set');
-	        return;
-	      }
-
 	      getLocalStream(function (stream) {
 	        // logMessage('outgoing call initiated');
 
@@ -204,6 +195,8 @@ export default Ember.Controller.extend({
 			remoteVideo.classList.add('active');
 			miniVideo.classList.add('active');
 			localVideo.src = '';
+			
+			finish(call);
 					
 	        call.on('error', function (e) {
 	          logError('error with call');
@@ -231,17 +224,21 @@ export default Ember.Controller.extend({
 	      call.on('stream', showRemoteStream);
 
 	      call.answer(localStream);
+		  
+		  finish(call);
 	    };
+		
+		var finish = function(call) {
+	  	  call.on('close', function(){
+	  	    messages.prepend('<div><span class="peer">Customer has left the chat.</span></div>');
+	  	  });	
+		};
 		
 		var connectChat = function(c) {
 		  if (c.label === 'chat') {
 		    c.on('data', function(data){
 			  messages.append('<div><span class="peer">Customer</span>: ' + data + '</div>');  
 			});
-		    c.on('close', function(){
-		      messages.append('<div><span class="peer">Customer has left the chat.</span></div>');
-			  delete peer.connections[recipientId];
-		    });
 		  }	else if (c.label === 'file') {
 		    c.on('data', function(data){
 			  if (data.constructor === ArrayBuffer) {
@@ -252,6 +249,7 @@ export default Ember.Controller.extend({
 			  }
 			});
 		  }
+		  connectedPeer = true;
 		};
 		
 		var send = function(){
@@ -259,7 +257,7 @@ export default Ember.Controller.extend({
 		  var file_name = fileInput.value;
 		  var files = document.getElementById("file-input").files;
 		  
-		  if (msg.length != 0) {
+		  if (msg.length > 0) {
 			var c = peer.connect(recipientId, { label: 'chat', serialization: 'none', metadata: {message: 'Chat started...'} });
 			c.on('open', function(){ c.send(msg); });
 		   	$('#messages').append('<div><span class="you">You: </span>' + msg + '</div>');
